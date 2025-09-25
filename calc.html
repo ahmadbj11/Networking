@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Kalkulator IP v4 & v6 (HTML+JS, tanpa server)</title>
+<style>
+/* —— Layout dasar —— */
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;line-height:1.45;margin:24px;background:#0b1220;color:#e7e9ee}
+.container{max-width:980px;margin:0 auto}
+.card{background:#111827;border:1px solid #1f2937;border-radius:14px;padding:18px 20px;margin-bottom:18px;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+h1{font-weight:700;margin:0 0 14px}
+h2{margin:0 0 10px}
+label{display:block;margin:8px 0 4px;font-size:14px;color:#c5c9d3}
+
+/* —— Input —— */
+input{
+  width:100%;
+  max-width:100%;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid #374151;
+  background:#0f172a;
+  color:#e7e9ee;
+}
+
+/* —— Grid form —— */
+.row{display:grid;gap:12px;grid-template-columns:1fr}
+.field{min-width:0}
+.help{color:#9fa6b2;font-size:13px}
+
+/* baris dua kolom umum */
+.row.two{grid-template-columns:1fr 1fr}
+
+/* baris khusus IP/Prefix: 2:1 */
+.row.split-2-1{grid-template-columns:2fr 1fr}
+
+@media (max-width:640px){
+  .row.two,
+  .row.split-2-1{grid-template-columns:1fr}
+}
+
+/* —— Tabel hasil —— */
+table{width:100%;border-collapse:separate;border-spacing:0 8px;table-layout:fixed}
+td{padding:10px 12px;background:#0f172a;border:1px solid #1f2937;vertical-align:top}
+.key{color:#9fa6b2;width:33%}
+.val{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-wrap:break-word;overflow-wrap:anywhere}
+
+/* —— Lain-lain —— */
+button{background:#2563eb;border:0;color:white;padding:10px 16px;border-radius:10px;cursor:pointer;margin-top:10px}
+button:hover{background:#1d4ed8}
+.error{background:#7f1d1d;color:#fff;padding:10px 12px;border-radius:10px;margin-top:10px;border:1px solid #b91c1c}
+footer{opacity:.7;margin-top:24px;font-size:12px}
+.kbd{background:#111827;border:1px solid #374151;border-radius:6px;padding:2px 6px}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧮 Kalkulator IP Address (IPv4 & IPv6)</h1>
+
+  <div class="card">
+    <h2>IPv4</h2>
+    <form id="form4">
+      <div class="row split-2-1">
+        <div class="field">
+          <label for="ip4">IP</label>
+          <input id="ip4" name="ip4" placeholder="192.168.1.10" />
+        </div>
+        <div class="field">
+          <label for="pfx4">Prefix</label>
+          <input id="pfx4" name="pfx4" placeholder="24" />
+        </div>
+      </div>
+      <button type="submit">Hitung IPv4</button>
+      <div id="err4" class="error" style="display:none"></div>
+    </form>
+
+    <div id="out4" style="display:none">
+      <table>
+        <tbody>
+        <tr><td class="key">Input</td><td id="v4_input" class="val"></td></tr>
+        <tr><td class="key">Network</td><td id="v4_net" class="val"></td></tr>
+        <tr><td class="key">Broadcast</td><td id="v4_bcast" class="val"></td></tr>
+        <tr><td class="key">Netmask</td><td id="v4_mask" class="val"></td></tr>
+        <tr><td class="key">Wildcard Mask</td><td id="v4_wild" class="val"></td></tr>
+        <tr><td class="key">Usable Range</td><td id="v4_range" class="val"></td></tr>
+        <tr><td class="key">Usable Host Count</td><td id="v4_usable" class="val"></td></tr>
+        <tr><td class="key">Reverse DNS</td><td id="v4_rev" class="val"></td></tr>
+        </tbody>
+      </table>
+      <div class="help">
+        Catatan: /31 memiliki 2 alamat usable (RFC 3021), /32 adalah host tunggal; untuk /31 & /32, nilai "Usable Range" menampilkan kedua/satu alamat yang ada.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>IPv6</h2>
+    <form id="form6">
+      <div class="row split-2-1">
+        <div class="field">
+          <label for="ip6">IP</label>
+          <input id="ip6" name="ip6" placeholder="2001:db8::1" />
+        </div>
+        <div class="field">
+          <label for="pfx6">Prefix</label>
+          <input id="pfx6" name="pfx6" placeholder="64" />
+        </div>
+      </div>
+      <button type="submit">Hitung IPv6</button>
+      <div id="err6" class="error" style="display:none"></div>
+    </form>
+
+    <div id="out6" style="display:none">
+      <table>
+        <tbody>
+        <tr><td class="key">Input</td><td id="v6_input" class="val"></td></tr>
+        <tr><td class="key">Expanded</td><td id="v6_expanded" class="val"></td></tr>
+        <tr><td class="key">Compressed</td><td id="v6_compressed" class="val"></td></tr>
+        <tr><td class="key">Network</td><td id="v6_net" class="val"></td></tr>
+        <tr><td class="key">Range</td><td id="v6_range" class="val"></td></tr>
+        <tr><td class="key">Address Count</td><td id="v6_count" class="val"></td></tr>
+        <tr><td class="key">Reverse DNS</td><td id="v6_rev" class="val"></td></tr>
+        </tbody>
+      </table>
+      <div class="help">Catatan: IPv6 tidak memiliki konsep broadcast; rentang adalah dari alamat network hingga alamat terakhir di subnet.</div>
+    </div>
+  </div>
+
+  <footer>© 2025 Anak Petani. All rights reserved</footer>
+</div>
+
+<script>
+// =========================
+// Helpers umum
+// =========================
+const err4 = document.getElementById('err4');
+const out4 = document.getElementById('out4');
+const err6 = document.getElementById('err6');
+const out6 = document.getElementById('out6');
+
+function showError(el, msg){ el.textContent = msg; el.style.display='block'; }
+function hideError(el){ el.style.display='none'; el.textContent=''; }
+function show(el){ el.style.display='block'; }
+function hide(el){ el.style.display='none'; }
+
+// =========================
+// IPv4 Utilities
+// =========================
+function isValidIPv4(ip){
+  const parts = ip.split('.');
+  if (parts.length !== 4) return false;
+  for (const p of parts){
+    if (!/^\d+$/.test(p)) return false;
+    const n = Number(p);
+    if (n < 0 || n > 255) return false;
+    if (p.length > 1 && p[0] === '0') { /* allow leading zero? keep simple: ok */ }
+  }
+  return true;
+}
+function ipv4ToU32(ip){
+  if (!isValidIPv4(ip)) throw new Error('IPv4 tidak valid');
+  return ip.split('.').reduce((acc, oct)=> (acc<<8) + Number(oct), 0) >>> 0; // unsigned
+}
+function u32ToIPv4(n){
+  return [24,16,8,0].map(shift => (n>>>shift)&255).join('.');
+}
+function prefixToMaskV4(pfx){
+  if (pfx===0) return '0.0.0.0';
+  const mask = (0xFFFFFFFF << (32 - pfx)) >>> 0;
+  return u32ToIPv4(mask);
+}
+function wildcardFromPrefixV4(pfx){
+  const mask = pfx===0 ? 0 : (0xFFFFFFFF << (32 - pfx)) >>> 0;
+  const wild = (~mask) >>> 0;
+  return u32ToIPv4(wild);
+}
+function networkV4(ip,pfx){
+  const n = ipv4ToU32(ip);
+  const mask = pfx===0 ? 0 : (0xFFFFFFFF << (32 - pfx)) >>> 0;
+  return u32ToIPv4(n & mask);
+}
+function broadcastV4(ip,pfx){
+  const n = ipv4ToU32(ip);
+  const mask = pfx===0 ? 0 : (0xFFFFFFFF << (32 - pfx)) >>> 0;
+  const bcast = (n & mask) | (~mask >>> 0);
+  return u32ToIPv4(bcast >>> 0);
+}
+function hostCountV4(pfx){
+  if (pfx === 31) return '2';
+  if (pfx === 32) return '1';
+  const total = 2 ** (32 - pfx);
+  return String(pfx <= 30 ? Math.max(0, total - 2) : total);
+}
+function rangeUsableV4(ip,pfx){
+  const net = ipv4ToU32(networkV4(ip,pfx));
+  const bcast = ipv4ToU32(broadcastV4(ip,pfx));
+  if (pfx >= 31) return [u32ToIPv4(net), u32ToIPv4(bcast)];
+  const first = net + 1;
+  const last  = bcast - 1;
+  if (first > last) return ['-','-'];
+  return [u32ToIPv4(first), u32ToIPv4(last)];
+}
+function reversePtrV4(ip){
+  return ip.split('.').reverse().join('.') + '.in-addr.arpa';
+}
+
+// =========================
+// IPv6 Utilities (BigInt)
+// =========================
+function isValidIPv6(ip){
+  try{ expandIPv6(ip); return true; }catch{ return false; }
+}
+function expandIPv6(ip){
+  // Normalize to full 8 hextets of 4 hex digits each
+  if (ip.indexOf('::') !== -1){
+    const [head, tail] = ip.split('::');
+    const headParts = head ? head.split(':') : [];
+    const tailParts = tail ? tail.split(':') : [];
+    const missing = 8 - (headParts.filter(Boolean).length + tailParts.filter(Boolean).length);
+    const zeros = Array(missing).fill('0');
+    const parts = [...(headParts.length?headParts:[]), ...zeros, ...(tailParts.length?tailParts:[])].map(h=>h||'0');
+    if (parts.length !== 8) throw new Error('IPv6 tidak valid');
+    return parts.map(h=>h.padStart(4,'0')).join(':');
+  } else {
+    const parts = ip.split(':');
+    if (parts.length !== 8) throw new Error('IPv6 tidak valid');
+    return parts.map(h=>{
+      if (!/^[0-9a-fA-F]{1,4}$/.test(h)) throw new Error('IPv6 tidak valid');
+      return h.padStart(4,'0');
+    }).join(':');
+  }
+}
+function compressIPv6(ip){
+  // ip may be short or expanded; convert to bytes then format + compress
+  const bytes = ipv6ToBytes(ip);
+  const hextets = [];
+  for (let i=0;i<16;i+=2){
+    hextets.push(((bytes[i]<<8) | bytes[i+1]).toString(16));
+  }
+  // find longest run of zeros
+  let bestStart=-1, bestLen=0;
+  let curStart=-1, curLen=0;
+  for (let i=0;i<8;i++){
+    if (hextets[i]==='0'){
+      if (curStart===-1){curStart=i; curLen=1;} else curLen++;
+      if (curLen>bestLen){bestLen=curLen; bestStart=curStart;}
+    } else {curStart=-1; curLen=0;}
+  }
+  if (bestLen>1){
+    const rep = hextets.slice(0,bestStart).join(':') + '::' + hextets.slice(bestStart+bestLen).join(':');
+    return rep.replace(/^:/,'').replace(/:$/,'');
+  }
+  return hextets.join(':');
+}
+function ipv6ToBytes(ip){
+  const exp = expandIPv6(ip);
+  const parts = exp.split(':');
+  const bytes = new Uint8Array(16);
+  for (let i=0;i<8;i++){
+    const v = parseInt(parts[i],16);
+    bytes[i*2] = (v>>>8)&255; bytes[i*2+1]=v&255;
+  }
+  return bytes;
+}
+function bytesToBigInt(bytes){
+  let x = 0n;
+  for (const b of bytes){ x = (x<<8n) + BigInt(b); }
+  return x;
+}
+function bigIntToBytes(x){
+  const bytes = new Uint8Array(16);
+  for (let i=15;i>=0;i--){ bytes[i] = Number(x & 0xffn); x >>= 8n; }
+  return bytes;
+}
+function ipv6ToBigInt(ip){ return bytesToBigInt(ipv6ToBytes(ip)); }
+function bigIntToIPv6(x){
+  const bytes = bigIntToBytes(x);
+  const hextets = [];
+  for (let i=0;i<16;i+=2){ hextets.push(((bytes[i]<<8)|bytes[i+1]).toString(16)); }
+  // compress
+  // find longest zero run
+  let bestStart=-1, bestLen=0, curStart=-1, curLen=0;
+  for (let i=0;i<8;i++){
+    if (hextets[i]==='0'){
+      if (curStart===-1){curStart=i;curLen=1;} else curLen++;
+      if (curLen>bestLen){bestLen=curLen;bestStart=curStart;}
+    } else {curStart=-1;curLen=0;}
+  }
+  if (bestLen>1){
+    const left = hextets.slice(0,bestStart).join(':');
+    const right = hextets.slice(bestStart+bestLen).join(':');
+    return (left?left:'') + '::' + (right?right:'');
+  }
+  return hextets.join(':');
+}
+function maskBitsV6(pfx){
+  if (pfx===0) return 0n;
+  const all = (1n<<128n) - 1n; // 2^128 - 1
+  const shift = 128n - BigInt(pfx);
+  if (shift===0n) return all;
+  const low = (1n<<shift) - 1n;
+  return all ^ low; // set top pfx bits to 1
+}
+function networkV6(ip,pfx){
+  const ipDec = ipv6ToBigInt(ip);
+  const mask = maskBitsV6(pfx);
+  return bigIntToIPv6(ipDec & mask);
+}
+function lastAddressV6(ip,pfx){
+  const net = ipv6ToBigInt(networkV6(ip,pfx));
+  const size = 1n << BigInt(128 - pfx);
+  const last = net + size - 1n;
+  return bigIntToIPv6(last);
+}
+function addressCountV6(pfx){
+  const n = 1n << BigInt(128 - pfx);
+  return n.toString();
+}
+function reversePtrV6(ip){
+  const bytes = ipv6ToBytes(ip);
+  let hex = '';
+  for (const b of bytes){ hex += b.toString(16).padStart(2,'0'); }
+  return hex.split('').reverse().join('.').concat('.ip6.arpa');
+}
+
+// =========================
+// Handlers
+// =========================
+document.getElementById('form4').addEventListener('submit', (e)=>{
+  e.preventDefault(); hideError(err4); hide(out4);
+  try{
+    const ip = (document.getElementById('ip4').value||'').trim();
+    const pfx = Number((document.getElementById('pfx4').value||'').trim());
+    if (!isValidIPv4(ip)) throw new Error('IPv4 tidak valid.');
+    if (!(pfx>=0 && pfx<=32)) throw new Error('Prefix IPv4 0..32.');
+
+    const net = networkV4(ip,pfx);
+    const bcast = broadcastV4(ip,pfx);
+    const mask = prefixToMaskV4(pfx);
+    const wild = wildcardFromPrefixV4(pfx);
+    const [first,last] = rangeUsableV4(ip,pfx);
+    const usable = hostCountV4(pfx);
+    const rev = reversePtrV4(ip);
+
+    document.getElementById('v4_input').textContent = ip + '/' + pfx;
+    document.getElementById('v4_net').textContent = net;
+    document.getElementById('v4_bcast').textContent = bcast;
+    document.getElementById('v4_mask').textContent = mask;
+    document.getElementById('v4_wild').textContent = wild;
+    document.getElementById('v4_range').textContent = first + ' - ' + last;
+    document.getElementById('v4_usable').textContent = usable;
+    document.getElementById('v4_rev').textContent = rev;
+
+    show(out4);
+  }catch(err){ showError(err4, err.message || String(err)); }
+});
+
+
+document.getElementById('form6').addEventListener('submit', (e)=>{
+  e.preventDefault(); hideError(err6); hide(out6);
+  try{
+    const ip = (document.getElementById('ip6').value||'').trim();
+    const pfx = Number((document.getElementById('pfx6').value||'').trim());
+    if (!isValidIPv6(ip)) throw new Error('IPv6 tidak valid.');
+    if (!(pfx>=0 && pfx<=128)) throw new Error('Prefix IPv6 0..128.');
+
+    const expanded = expandIPv6(ip);
+    const compressed = compressIPv6(ip);
+    const network = networkV6(ip,pfx);
+    const first = network; // no broadcast
+    const last = lastAddressV6(ip,pfx);
+    const count = addressCountV6(pfx);
+    const rev = reversePtrV6(ip);
+
+    document.getElementById('v6_input').textContent = compressed + '/' + pfx;
+    document.getElementById('v6_expanded').textContent = expanded;
+    document.getElementById('v6_compressed').textContent = compressed;
+    document.getElementById('v6_net').textContent = network;
+    document.getElementById('v6_range').textContent = first + ' - ' + last;
+    document.getElementById('v6_count').textContent = count;
+    document.getElementById('v6_rev').textContent = rev;
+
+    show(out6);
+  }catch(err){ showError(err6, err.message || String(err)); }
+});
+</script>
+</body>
+</html>
